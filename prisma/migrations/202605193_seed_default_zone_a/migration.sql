@@ -1,0 +1,2 @@
+-- Superseded by tenant-aware runtime provisioning in lib/tenant.ts.
+-- Default zones are now created per Clerk workspace, not globally.

@@ -1,0 +1,315 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String              @id @default(cuid())
+  clerkUserId  String?             @unique
+  email        String              @unique
+  name         String?
+  role         String              @default("operator")
+  companyId    String?
+  company      Company?            @relation(fields: [companyId], references: [id])
+  memberships  CompanyMembership[]
+  joinRequests CompanyJoinRequest[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+model Company {
+  id                       String              @id @default(cuid())
+  clerkOrganizationId       String?             @unique
+  personalOwnerClerkUserId  String?             @unique
+  name                     String
+  users                    User[]
+  memberships              CompanyMembership[]
+  products                 Product[]
+  warehouses               Warehouse[]
+  channels                 Channel[]
+  orders                   Order[]
+  domains                  CompanyDomain[]
+  joinRequests             CompanyJoinRequest[]
+  invitations              CompanyInvitation[]
+  onboardingStatus         String              @default("pending")
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+}
+
+model CompanyDomain {
+  id                         String    @id @default(cuid())
+  companyId                  String
+  company                    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  domain                     String
+  clerkOrganizationId         String?
+  clerkOrganizationDomainId   String?
+  verifiedAt                 DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  @@unique([companyId, domain])
+  @@index([domain])
+  @@index([companyId])
+}
+
+model CompanyJoinRequest {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String
+  domain    String
+  status    String   @default("pending")
+  message   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, userId])
+  @@index([domain])
+}
+
+model CompanyInvitation {
+  id                String   @id @default(cuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  email             String
+  role              String   @default("operator")
+  status            String   @default("pending")
+  clerkInvitationId String?
+  invitedByUserId   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([companyId, email])
+  @@index([email])
+  @@index([companyId])
+}
+
+model CompanyMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role      String   @default("operator")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, companyId])
+}
+
+model Product {
+  id          String           @id @default(cuid())
+  companyId   String
+  company     Company          @relation(fields: [companyId], references: [id])
+  name        String
+  brand       String?
+  category    String?
+  description String?
+  skus        SKU[]
+  listings    ChannelListing[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model SKU {
+  id             String          @id @default(cuid())
+  productId      String
+  product        Product         @relation(fields: [productId], references: [id])
+  code           String
+  barcode        String?
+  inventoryItems InventoryItem[]
+  orderItems     OrderItem[]
+  spotAssignments SpotProductAssignment[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([code])
+}
+
+model InventoryItem {
+  id          String            @id @default(cuid())
+  skuId       String
+  sku         SKU               @relation(fields: [skuId], references: [id])
+  warehouseId String
+  warehouse   Warehouse         @relation(fields: [warehouseId], references: [id])
+  locationId  String?
+  location    WarehouseLocation? @relation(fields: [locationId], references: [id])
+  available   Int               @default(0)
+  reserved    Int               @default(0)
+  reorderPoint Int              @default(0)
+  updatedAt   DateTime          @updatedAt
+}
+
+model Warehouse {
+  id             String              @id @default(cuid())
+  companyId      String
+  company        Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name           String
+  address        String?
+  code           String?
+  locations      WarehouseLocation[]
+  zones          Zone[]
+  inventoryItems InventoryItem[]
+  tasks          WarehouseTask[]
+  orders         Order[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([companyId, name])
+}
+
+model Zone {
+  id          String            @id @default(cuid())
+  warehouseId String
+  warehouse   Warehouse         @relation(fields: [warehouseId], references: [id])
+  name        String
+  code        String?
+  layout      WarehouseLayout?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([warehouseId, name])
+}
+
+model WarehouseLocation {
+  id             String          @id @default(cuid())
+  warehouseId    String
+  warehouse      Warehouse       @relation(fields: [warehouseId], references: [id])
+  code           String
+  zone           String?
+  type           String          @default("bin")
+  inventoryItems InventoryItem[]
+  tasks          WarehouseTask[]
+
+  @@unique([warehouseId, code])
+}
+
+model WarehouseLayout {
+  id            String       @id @default(cuid())
+  warehouseId   String
+  zoneId        String       @unique
+  zone          Zone         @relation(fields: [zoneId], references: [id])
+  rows          Int
+  columns       Int
+  rowAliases    Json?
+  spots         PalletSpot[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([warehouseId, zoneId])
+}
+
+model PalletSpot {
+  id        String          @id @default(cuid())
+  layoutId  String
+  layout    WarehouseLayout @relation(fields: [layoutId], references: [id])
+  row       Int
+  column    Int
+  code      String
+  status    String
+  levels    Int
+  notes     String?
+  productAssignments SpotProductAssignment[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@unique([layoutId, row, column])
+  @@unique([layoutId, code])
+}
+
+model SpotProductAssignment {
+  id           String     @id @default(cuid())
+  palletSpotId String
+  palletSpot   PalletSpot @relation(fields: [palletSpotId], references: [id], onDelete: Cascade)
+  skuId        String
+  sku          SKU        @relation(fields: [skuId], references: [id])
+  level        Int
+  quantity     Int        @default(1)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([palletSpotId, skuId, level])
+  @@index([palletSpotId])
+  @@index([skuId])
+}
+
+model Order {
+  id          String          @id @default(cuid())
+  companyId   String
+  company     Company         @relation(fields: [companyId], references: [id])
+  channelId   String
+  channel     Channel         @relation(fields: [channelId], references: [id])
+  warehouseId String?
+  warehouse   Warehouse?      @relation(fields: [warehouseId], references: [id])
+  externalId  String?
+  customerName String
+  status      String
+  totalCents  Int
+  items       OrderItem[]
+  tasks       WarehouseTask[]
+  placedAt    DateTime
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id])
+  skuId     String
+  sku       SKU    @relation(fields: [skuId], references: [id])
+  quantity  Int
+  unitCents Int
+}
+
+model Channel {
+  id        String           @id @default(cuid())
+  companyId String
+  company   Company          @relation(fields: [companyId], references: [id])
+  name      String
+  type      String
+  status    String           @default("connected")
+  lastSyncAt DateTime?
+  listings  ChannelListing[]
+  orders    Order[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model ChannelListing {
+  id          String   @id @default(cuid())
+  channelId   String
+  channel     Channel  @relation(fields: [channelId], references: [id])
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  externalId  String?
+  status      String   @default("synced")
+  priceCents  Int?
+  updatedAt   DateTime @updatedAt
+
+  @@unique([channelId, productId])
+}
+
+model WarehouseTask {
+  id          String             @id @default(cuid())
+  warehouseId String
+  warehouse   Warehouse          @relation(fields: [warehouseId], references: [id])
+  orderId     String?
+  order       Order?             @relation(fields: [orderId], references: [id])
+  locationId  String?
+  location    WarehouseLocation? @relation(fields: [locationId], references: [id])
+  type        String
+  status      String             @default("open")
+  priority    String             @default("medium")
+  assignedTo  String?
+  dueAt       DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}

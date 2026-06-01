@@ -1,0 +1,2 @@
+-- Superseded by 202605201_clerk_multi_tenant.
+-- Kept as a no-op so migration history remains linear after the Supabase reset.

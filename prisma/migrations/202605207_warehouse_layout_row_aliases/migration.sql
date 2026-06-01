@@ -1,0 +1,1 @@
+ALTER TABLE "WarehouseLayout" ADD COLUMN IF NOT EXISTS "rowAliases" JSONB;

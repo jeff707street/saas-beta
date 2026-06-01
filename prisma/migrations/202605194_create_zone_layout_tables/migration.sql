@@ -1,0 +1,2 @@
+-- Superseded by 202605201_clerk_multi_tenant.
+-- Zone layout tables are included in the multi-tenant baseline migration.
